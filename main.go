@@ -6,10 +6,10 @@ import (
 )
 
 func main() {
-	songDir := "./toec/"
+	songDir := "./el-pastor/"
 	filename := songDir + "gp.mid"
 
-	info, err := GetMidiNotes(filename, 1)
+	info, err := GetMidiNotes(filename, 2)
 	if err != nil {
 		panic(err)
 	}
@@ -29,13 +29,13 @@ func main() {
 		panic(err)
 	}
 
-	if _, err := os.Stat(songDir + "beats.chart"); !os.IsNotExist(err) {
-		err = os.Remove(songDir + "beats.chart")
+	if _, err := os.Stat(songDir + "notes.chart"); !os.IsNotExist(err) {
+		err = os.Remove(songDir + "notes.chart")
 		if err != nil {
 			panic(err)
 		}
 	}
-	f, err := os.OpenFile(songDir+"beats.chart", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(songDir+"notes.chart", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
 	}
