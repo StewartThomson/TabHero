@@ -13,22 +13,22 @@ const (
 	MAX_UNIQUES = 5
 )
 
-//Provide a fitness. Patterns with >6 notes are severely punished. Longer & more diverse patterns are rewarded
-//Occurrences of notes that are similar on either side of a barrier are only lightly punished
-func (X Notes) Evaluate() (float64, error) {
+//Provide a fitness. Patterns with >6 beats are severely punished. Longer & more diverse patterns are rewarded
+//Occurrences of beats that are similar on either side of a barrier are only lightly punished
+func (b Beats) Evaluate() (float64, error) {
 	fitness := 0.0
 	numUniques := 0
 	sumOfUniques := 0
-	note := 0
 	niceToHave := 0.0
 	reward := 0
 	numTotal := 0
 	numBarriers := 0
-	var noteMap = map[int]bool{}
+	var pitchMap = map[int8]bool{}
+	var pitch int8
 
-	for i := 0; i < X.setLength; i++ {
-		note = X.noteSet[i].value
-		if note == -1 {
+	for i := 0; i < b.setLength; i++ {
+		pitch = b.beatSet[i].Value()
+		if pitch == -1 {
 			numBarriers++
 			if numUniques != 0 {
 				if numUniques > MAX_UNIQUES {
@@ -36,12 +36,12 @@ func (X Notes) Evaluate() (float64, error) {
 				} else {
 					reward -= numTotal * numUniques
 				}
-				if i != 0 && i != X.setLength-1 {
-					back := X.noteSet[i-1].value
-					forward := X.noteSet[i+1].value
+				if i != 0 && i != b.setLength-1 {
+					back := b.beatSet[i-1].Value()
+					forward := b.beatSet[i+1].Value()
 					j := i + 1
-					for forward == -1 && j != X.setLength-1 {
-						forward = X.noteSet[j].value
+					for forward == -1 && j != b.setLength-1 {
+						forward = b.beatSet[j].Value()
 						j++
 					}
 					if forward != -1 {
@@ -53,19 +53,19 @@ func (X Notes) Evaluate() (float64, error) {
 				}
 				numUniques = 0
 				sumOfUniques = 0
-				noteMap = map[int]bool{}
+				pitchMap = map[int8]bool{}
 				numTotal = 0
 			}
 		} else {
-			if _, ok := noteMap[note]; !ok {
+			if _, ok := pitchMap[pitch]; !ok {
 				numUniques++
-				sumOfUniques += note
-				noteMap[note] = true
+				sumOfUniques += int(pitch)
+				pitchMap[pitch] = true
 			}
 			numTotal++
 		}
 	}
-	if note != -1 {
+	if pitch != -1 {
 		if numUniques > MAX_UNIQUES {
 			fitness += math.Pow(float64(numUniques+sumOfUniques), 3)
 		} else {
@@ -80,82 +80,88 @@ func (X Notes) Evaluate() (float64, error) {
 }
 
 //1 in 2 chance of mutating each barrier. The barrier is then moved forward/backward/ or deleted
-func (X Notes) Mutate(rng *rand.Rand) {
-	for i := 0; i < X.setLength; i++ {
-		if X.noteSet[i].value == -1 {
+func (b Beats) Mutate(rng *rand.Rand) {
+	for i := 0; i < b.setLength; i++ {
+		if b.beatSet[i].Value() == -1 {
 			direction := rng.Intn(6)
 			velocity := rng.Intn(1) + 1
 			pos := i
 			//move forward
 			if direction == 0 {
-				for pos != X.setLength-1 && velocity != 0 {
+				for pos != b.setLength-1 && velocity != 0 {
 					//swap
-					X.noteSet[pos], X.noteSet[pos+1] = X.noteSet[pos+1], X.noteSet[pos]
+					b.beatSet[pos], b.beatSet[pos+1] = b.beatSet[pos+1], b.beatSet[pos]
 					pos++
 					velocity--
 				}
 			} else if direction == 1 { //move backward
 				for pos != 0 && velocity != 0 {
 					//swap
-					X.noteSet[pos], X.noteSet[pos-1] = X.noteSet[pos-1], X.noteSet[pos]
+					b.beatSet[pos], b.beatSet[pos-1] = b.beatSet[pos-1], b.beatSet[pos]
 					pos--
 					velocity--
 				}
 			} else if direction == 2 { //delete
-				if pos != X.setLength-1 {
-					X.noteSet = append(X.noteSet[:pos], X.noteSet[pos+1:]...)
-					X.setLength--
-				}
+				//if pos != b.setLength-1 {
+				//	b.beatSet = append(b.beatSet[:pos], b.beatSet[pos+1:]...)
+				//	b.setLength--
+				//}
 			}
 		}
 	}
 }
 
 //Can't really be implemented here.
-func (X Notes) Crossover(Y eaopt.Genome, rng *rand.Rand) {}
+func (b Beats) Crossover(Y eaopt.Genome, rng *rand.Rand) {}
 
-func (X Notes) Clone() eaopt.Genome {
-	Y := Notes{
-		noteSet:      make([]Note, len(X.noteSet)),
-		globalRange:  X.globalRange,
-		numRealNotes: X.numRealNotes,
-		setLength:    X.setLength,
+func (b Beats) Clone() eaopt.Genome {
+	Y := Beats{
+		beatSet:      make([]Beat, len(b.beatSet)),
+		globalRange:  b.globalRange,
+		numRealBeats: b.numRealBeats,
+		setLength:    b.setLength,
 	}
-	copy(Y.noteSet, X.noteSet)
+	copy(Y.beatSet, b.beatSet)
 	return Y
 }
 
 //Randomly distribute -1 throughout the array. This denotes a barrier between patterns
-func NoteFactory(noteArr Notes, rng *rand.Rand) eaopt.Genome {
-	numNotes := noteArr.numRealNotes
+func NoteFactory(noteArr Beats, rng *rand.Rand) eaopt.Genome {
+	numNotes := noteArr.numRealBeats
 	mindivs := 0
 	numdivs := rng.Intn(numNotes-mindivs) + mindivs
-	var arr = make([]Note, numNotes+numdivs)
-	copy(arr, noteArr.noteSet)
+	var arr = make([]Beat, numNotes+numdivs)
+	copy(arr, noteArr.beatSet)
 	for i := 0; i < numdivs; i++ {
-		spot := rng.Intn(numNotes + numdivs - 2)
+		spot := rng.Intn(len(arr))
 		copy(arr[spot+1:], arr[spot:])
-		arr[spot].value = -1
+		arr[spot] = Barrier{}
 	}
-	return Notes{
-		noteSet:      arr,
-		numRealNotes: noteArr.numRealNotes,
+	//Some barriers may have been pushed out of the end, just replace them here
+	for i := len(arr) - 1; i > 0; i-- {
+		if arr[i] == nil {
+			arr[i] = Barrier{}
+		}
+	}
+	return Beats{
+		beatSet:      arr,
+		numRealBeats: noteArr.numRealBeats,
 		globalRange:  noteArr.globalRange,
 		setLength:    len(arr),
 	}
 }
 
-//Failed patterns defined as a pattern with over 6 unique notes
-func (X Notes) CountFailedPatterns() (int, []int) {
+//Failed patterns defined as a pattern with over 6 unique beats
+func (b Beats) CountFailedPatterns() (int, []int) {
 	ret := 0
 	numUniques := 0.0
 	uniqueSum := 0
-	note := 0
-	var noteMap = map[int]bool{}
+	var pitch int8
+	var pitchMap = map[int8]bool{}
 	var uniqueSums []int
-	for i := 0; i < X.setLength; i++ {
-		note = X.noteSet[i].value
-		if note == -1 {
+	for i := 0; i < b.setLength; i++ {
+		pitch = b.beatSet[i].Value()
+		if pitch == -1 {
 			if numUniques != 0 {
 				if numUniques > MAX_UNIQUES {
 					ret += 1
@@ -163,17 +169,17 @@ func (X Notes) CountFailedPatterns() (int, []int) {
 				}
 				numUniques = 0
 				uniqueSum = 0
-				noteMap = map[int]bool{}
+				pitchMap = map[int8]bool{}
 			}
 		} else {
-			if _, ok := noteMap[note]; !ok {
+			if _, ok := pitchMap[pitch]; !ok {
 				numUniques++
-				uniqueSum += note
-				noteMap[note] = true
+				uniqueSum += int(pitch)
+				pitchMap[pitch] = true
 			}
 		}
 	}
-	if note != -1 {
+	if pitch != -1 {
 		if numUniques > MAX_UNIQUES {
 			ret += 1
 			uniqueSums = append(uniqueSums, int(numUniques))
@@ -182,12 +188,12 @@ func (X Notes) CountFailedPatterns() (int, []int) {
 	return ret, uniqueSums
 }
 
-func PatternizeNotes(X Notes) (patternized Notes, err error) {
+func PatternizeNotes(X Beats) (patternized Beats, err error) {
 	ga, err := eaopt.NewDefaultGAConfig().NewGA()
 	if err != nil {
 		return
 	}
-	ga.ParallelEval = true
+	ga.ParallelEval = false
 
 	//Modify these!
 	ga.NGenerations = 750
@@ -214,11 +220,11 @@ func PatternizeNotes(X Notes) (patternized Notes, err error) {
 	}
 	fmt.Printf("Process took %s\n", time.Since(start))
 
-	best := ga.HallOfFame[0].Genome.(Notes)
+	best := ga.HallOfFame[0].Genome.(Beats)
 	a, b := best.CountFailedPatterns()
 	fmt.Println("Best ", a, b)
 
-	patternized = best.Clone().(Notes)
+	patternized = best.Clone().(Beats)
 
 	return
 }

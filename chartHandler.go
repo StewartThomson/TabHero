@@ -36,7 +36,7 @@ func CreateChartFromMidi(patterns []Pattern, info MidiInfo) (chart ChartoGopher.
 	chart.AddTrack(expertGuitar)
 
 	//Building buckets based on note distribution
-	percentiles := buildPercentiles(getNotesAsFloats(info.notes.noteSet), 5-DISABLE_OPENS)
+	percentiles := buildPercentiles(getNotesAsFloats(info.beats.unstructuredNotes), 5-DISABLE_OPENS)
 
 	for _, pattern := range patterns {
 		ProcessPattern(pattern, expertGuitar, percentiles)
@@ -67,18 +67,18 @@ func getNotesAsFloats(notes []Note) (fnotes []float64) {
 }
 
 func AssignColours(pattern Pattern, chartTrack *ChartoGopher.Track, startingPos, incr int) {
-	colorMap := map[int]int{}
+	colorMap := map[int8]int{}
 	copyToSort := pattern.GetSortedCopy()
 	i := startingPos
-	for _, note := range copyToSort.notes {
-		if _, ok := colorMap[note.value]; !ok {
-			colorMap[note.value] = i
+	for _, beat := range copyToSort.beats {
+		if _, ok := colorMap[beat.Value()]; !ok {
+			colorMap[beat.Value()] = i
 			i += incr
 		}
 	}
-	for _, note := range pattern.notes {
+	for _, beat := range pattern.beats {
 		var noteColor ChartoGopher.Button
-		switch colorMap[note.value] {
+		switch colorMap[beat.Value()] {
 		case 0:
 			noteColor = ChartoGopher.BTN_OPEN
 			break
@@ -98,12 +98,12 @@ func AssignColours(pattern Pattern, chartTrack *ChartoGopher.Track, startingPos,
 			noteColor = ChartoGopher.BTN_ORANGE
 			break
 		}
-		chartTrack.AddNote(note.position, noteColor, note.duration, false, false)
+		chartTrack.AddNote(beat.Position(), noteColor, beat.Duration(), false, false)
 	}
 }
 
 //The over-arching song is divided into 6 "buckets" to get a good pitch reference
-func findBucketResult(toFind int, percentiles []float64) int {
+func findBucketResult(toFind int8, percentiles []float64) int {
 	if InRange(float64(toFind), 0, percentiles[0]) {
 		return 0
 	}

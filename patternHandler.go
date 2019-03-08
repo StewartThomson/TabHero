@@ -3,86 +3,86 @@ package main
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/tools/container/intsets"
+	"math"
 	"sort"
 )
 
 type Pattern struct {
-	notes      []Note
+	beats      []Beat
 	numUniques int
-	min        int
-	max        int
+	min        int8
+	max        int8
 	uniqueSum  int
 }
 
 //For Pattern to implement Sort interface
 func (pattern Pattern) Len() int {
-	return len(pattern.notes)
+	return len(pattern.beats)
 }
 func (pattern Pattern) Swap(i, j int) {
-	pattern.notes[i], pattern.notes[j] = pattern.notes[j], pattern.notes[i]
+	pattern.beats[i], pattern.beats[j] = pattern.beats[j], pattern.beats[i]
 }
 func (pattern Pattern) Less(i, j int) bool {
-	return pattern.notes[i].value < pattern.notes[j].value
+	return pattern.beats[i].Value() < pattern.beats[j].Value()
 }
 
 //Divide the noteset into patterns. -1 denotes a pattern barrier
-func GetPatternsFromNoteSet(notes Notes) (patterns []Pattern, err error) {
-	noteSet := notes.noteSet
+func GetPatternsFromNoteSet(beats Beats) (patterns []Pattern, err error) {
+	beatSet := beats.beatSet
 	numUniques := 0
 	uniqueSum := 0
-	var noteMap = map[int]bool{}
+	var noteMap = map[int8]bool{}
 	patterns = make([]Pattern, 0)
 	var note Note
 	var pattern Pattern
 	pattern = Pattern{
-		notes: make([]Note, 0),
-		min:   intsets.MaxInt,
-		max:   intsets.MinInt,
+		beats: make([]Beat, 0),
+		min:   math.MaxInt8,
+		max:   math.MinInt8,
 	}
 
-	for i := 0; i < notes.setLength; i++ {
-		note := noteSet[i]
-		if note.value == -1 {
-			if len(pattern.notes) != 0 {
+	for i := 0; i < beats.setLength; i++ {
+		beat := beatSet[i]
+		if beat.Value() == -1 {
+			if len(pattern.beats) != 0 {
 				if numUniques > 6 {
-					err = errors.New(fmt.Sprintf("pattern found with %d unique notes", numUniques))
+					err = errors.New(fmt.Sprintf("pattern found with %d unique beats", numUniques))
 					return
 				}
 				pattern.numUniques = numUniques
 				pattern.uniqueSum = uniqueSum
 				patterns = append(patterns, pattern)
 				pattern = Pattern{
-					notes: make([]Note, 0),
-					min:   intsets.MaxInt,
-					max:   intsets.MinInt,
+					beats: make([]Beat, 0),
+					min:   math.MaxInt8,
+					max:   math.MinInt8,
 				}
 				numUniques = 0
 				uniqueSum = 0
-				noteMap = map[int]bool{}
+				noteMap = map[int8]bool{}
 			}
 		} else {
-			if _, ok := noteMap[note.value]; !ok {
-				if note.value < pattern.min {
-					pattern.min = note.value
+			if _, ok := noteMap[beat.Value()]; !ok {
+				if beat.Value() < pattern.min {
+					pattern.min = beat.Value()
 				}
-				if note.value > pattern.max {
-					pattern.max = note.value
+				if beat.Value() > pattern.max {
+					pattern.max = beat.Value()
 				}
 				numUniques++
-				uniqueSum += note.value
-				noteMap[note.value] = true
+				uniqueSum += int(beat.Value())
+				noteMap[beat.Value()] = true
 			}
-			pattern.notes = append(pattern.notes, note)
+			pattern.beats = append(pattern.beats, beat)
 		}
 	}
 
 	if note.value != -1 {
 		if numUniques > 6 {
-			err = errors.New(fmt.Sprintf("pattern found with %d unique notes", numUniques))
+			err = errors.New(fmt.Sprintf("pattern found with %d unique beats", numUniques))
 			return
 		}
-		if len(pattern.notes) != 0 {
+		if len(pattern.beats) != 0 {
 			pattern.numUniques = numUniques
 			pattern.uniqueSum = uniqueSum
 			patterns = append(patterns, pattern)
@@ -94,9 +94,9 @@ func GetPatternsFromNoteSet(notes Notes) (patterns []Pattern, err error) {
 
 func (pattern Pattern) GetSortedCopy() Pattern {
 	copyToSort := Pattern{
-		notes: make([]Note, len(pattern.notes)),
+		beats: make([]Beat, len(pattern.beats)),
 	}
-	copy(copyToSort.notes, pattern.notes)
+	copy(copyToSort.beats, pattern.beats)
 	sort.Sort(copyToSort)
 
 	return copyToSort

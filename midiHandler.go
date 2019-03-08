@@ -2,18 +2,18 @@ package main
 
 import (
 	"github.com/go-audio/midi"
-	"golang.org/x/tools/container/intsets"
+	"math"
 	"os"
 )
 
 type MidiInfo struct {
-	notes       Notes
+	beats       Beats
 	tickRate    uint16
-	highestNote int
-	lowestNote  int
+	highestNote int8
+	lowestNote  int8
 	tempos      []Tempo
 	timeSigs    []TimeSignature
-	noteRange   int
+	noteRange   int8
 }
 
 type Tempo struct {
@@ -55,8 +55,8 @@ func GetMidiNotes(filename string, trackToParse int) (info MidiInfo, err error) 
 		}
 	}
 
-	info.highestNote = intsets.MinInt
-	info.lowestNote = intsets.MaxInt
+	info.highestNote = math.MinInt8
+	info.lowestNote = math.MaxInt8
 
 	track := decoder.Tracks[trackToParse]
 	tickOffset := decoder.Tracks[trackToParse-1].Events[len(decoder.Tracks[trackToParse-1].Events)-1].AbsTicks
@@ -71,9 +71,8 @@ func GetMidiNotes(filename string, trackToParse int) (info MidiInfo, err error) 
 		}
 	}
 
-	info.notes = Notes{
-		noteSet:      make([]Note, 0),
-		numRealNotes: 0,
+	info.beats = Beats{
+		numRealBeats: 0,
 	}
 	noteStatus := map[uint8]uint64{}
 	for _, ev := range track.Events {
@@ -85,22 +84,31 @@ func GetMidiNotes(filename string, trackToParse int) (info MidiInfo, err error) 
 			if distance <= float64(info.tickRate/2) {
 				distance = 0
 			}
-			note := int(ev.Note)
-			if note > info.highestNote {
-				info.highestNote = note
+			pitch := int8(ev.Note)
+			if pitch > info.highestNote {
+				info.highestNote = pitch
 			}
-			if note < info.lowestNote {
-				info.lowestNote = note
+			if pitch < info.lowestNote {
+				info.lowestNote = pitch
 			}
-			info.notes.noteSet = append(info.notes.noteSet, Note{
-				value:    note,
+			note := Note{
+				value:    pitch,
 				duration: int(distance * 0.85),
 				position: int(noteStatus[ev.Note] - tickOffset),
-			})
-			info.notes.numRealNotes++
+			}
+			if len(info.beats.beatSet) > 0 {
+				if info.beats.beatSet[len(info.beats.beatSet)-1].Position() == int(noteStatus[ev.Note]-tickOffset) {
+					info.beats.AppendToChord(note)
+				} else {
+					info.beats.AddNote(note)
+				}
+			} else {
+				info.beats.AddNote(note)
+			}
+			info.beats.unstructuredNotes = append(info.beats.unstructuredNotes, note)
 		}
 	}
 	info.noteRange = info.highestNote - info.lowestNote
-	info.notes.globalRange = info.noteRange
+	info.beats.globalRange = info.noteRange
 	return
 }

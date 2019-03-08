@@ -5,29 +5,16 @@ import (
 	"os"
 )
 
-type Note struct {
-	value    int
-	duration int
-	position int
-}
-
-type Notes struct {
-	noteSet      []Note
-	globalRange  int
-	numRealNotes int
-	setLength    int
-}
-
 func main() {
 	songDir := "./toec/"
 	filename := songDir + "gp.mid"
 
-	info, err := GetMidiNotes(filename, 0)
+	info, err := GetMidiNotes(filename, 1)
 	if err != nil {
 		panic(err)
 	}
 
-	patternDenoted, err := PatternizeNotes(info.notes)
+	patternDenoted, err := PatternizeNotes(info.beats)
 	if err != nil {
 		panic(err)
 	}
@@ -42,13 +29,13 @@ func main() {
 		panic(err)
 	}
 
-	if _, err := os.Stat(songDir + "notes.chart"); !os.IsNotExist(err) {
-		err = os.Remove(songDir + "notes.chart")
+	if _, err := os.Stat(songDir + "beats.chart"); !os.IsNotExist(err) {
+		err = os.Remove(songDir + "beats.chart")
 		if err != nil {
 			panic(err)
 		}
 	}
-	f, err := os.OpenFile(songDir+"notes.chart", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(songDir+"beats.chart", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
 	}
